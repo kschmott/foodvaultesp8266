@@ -5,15 +5,10 @@
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>         // https://github.com/tzapu/WiFiManager
 
-const int buttonPin = 12; // the number of the pushbutton pin
-int buttonState;            // the current reading from the input pin
-int lastButtonState = LOW;
-unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-unsigned long debounceDelay = 50;  
+
 
 void setup() {
-   pinMode(buttonPin, INPUT);
-    Serial.begin(115200);
+    Serial.begin(9600);
 
     // Initialize Wi-Fi manager
     WiFiManager wifiManager;
@@ -23,7 +18,7 @@ void setup() {
     // Set AP timeout to 120 seconds. If no client connects within this time, ESP will try to connect to previously saved WiFi credentials
     wifiManager.setTimeout(120);
 
-    if (!wifiManager.autoConnect("NodeMCU AP")) {
+    if (!wifiManager.autoConnect("ESP-01")) {
         Serial.println("Failed to connect and hit timeout");
         // Reset and try again, or maybe put it to deep sleep
         ESP.reset();
@@ -34,38 +29,44 @@ void setup() {
 }
 
 void loop() {
-    // Your code here for what happens after connection
-      int reading = digitalRead(buttonPin);
-  // read the state of the pushbutton value:
-// If the switch changed, due to noise or pressing:
-  if (reading != lastButtonState) {
-    // reset the debouncing timer
-    lastDebounceTime = millis();
-  }
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    // whatever the reading is at, it's been there for longer than the debounce
-    // delay, so take it as the actual current state:
-
-    // if the button state has changed:
-    if (reading != buttonState) {
-      buttonState = reading;
-
-      // only toggle the LED if the new button state is HIGH
-      if (buttonState == HIGH) {
-         WiFiClientSecure httpsClient; //Declare object of class WiFiClient
-          httpsClient.setInsecure(); // the ESP8266 does not have the certificate to verify the server's identity
-
-          HTTPClient http;
-        if(http.begin(httpsClient, "https://eecs373foodvault.vercel.app/api/temp")){
-          int httpCode = http.DELETE();
-            Serial.printf("[HTTPS] DELETE... code: %d\n", httpCode);
-        }
-      }
-    }
-  // check if the pushbutton is pressed. If it is, the buttonState is LOW:
   
+    if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n'); // Read the command
+    if (command == "LIST") {
+      fetchList();
+    }else if (command.startsWith("DELETE")){
+      command.replace("DELETE", "");
+      deleteItem(command);
+    }
+   
+  }
 }
-lastButtonState = reading;
+void deleteItem(String id){
+  WiFiClientSecure httpsClient;
+  httpsClient.setInsecure();
+  HTTPClient http;
+  http.begin(httpsClient, "https://eecs373foodvault.vercel.app/api/foodOrders?id=" + id); 
+  int httpCode = http.DELETE();
+   if (httpCode > 0) { // Check for the returning code
+    String payload = http.getString();
+    Serial.println(payload);
+  } else {
+    Serial.println("Error on HTTP request");
+  }
 
+}
+
+void fetchList(){
+  WiFiClientSecure httpsClient;
+  httpsClient.setInsecure();
+  HTTPClient http;
+   http.begin(httpsClient, "https://eecs373foodvault.vercel.app/api/foodOrders?mode=string"); 
+   int httpCode = http.GET();
+   if (httpCode > 0) { // Check for the returning code
+    String payload = http.getString();
+    Serial.println(payload);
+  } else {
+    Serial.println("Error on HTTP request");
+  }
 
 }

@@ -32,11 +32,17 @@ void loop() {
   
     if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n'); // Read the command
+    Serial.printf("Recieved Command %s\r\n", command);
+
     if (command == "LIST") {
       fetchList();
     }else if (command.startsWith("DELETE")){
       command.replace("DELETE", "");
       deleteItem(command);
+    }else if(command.startsWith("PUT")){
+      String box = command.substring(3,4);
+      String id = command.substring(4);
+      updateBoxStatus(id, box);
     }
    
   }
@@ -54,6 +60,19 @@ void deleteItem(String id){
     Serial.println("Error on HTTP request");
   }
 
+}
+void updateBoxStatus(String id, String box){
+  WiFiClientSecure httpsClient;
+  httpsClient.setInsecure();
+  HTTPClient http;
+  http.begin(httpsClient, "https://eecs373foodvault.vercel.app/api/foodOrders?id=" + id + "&box=" + box); 
+  int httpCode = http.PUT(nullptr, 0);
+   if (httpCode > 0) { // Check for the returning code
+    String payload = http.getString();
+    Serial.println(payload);
+  } else {
+    Serial.println("Error on HTTP request");
+  }
 }
 
 void fetchList(){
